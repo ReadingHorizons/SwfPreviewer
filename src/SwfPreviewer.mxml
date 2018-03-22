@@ -14,6 +14,7 @@
 	<fx:Script>
 		<![CDATA[
 			import mx.controls.SWFLoader;
+			import mx.events.ColorPickerEvent;
 			import mx.events.FlexEvent;
 			import mx.flash.UIMovieClip;
 			import mx.managers.SystemManager;
@@ -84,6 +85,18 @@
 				fileSystem.browseForDirectory("Select the folder that contains the swf files that you want to preview.");
 			}
 			
+			private function handleColorChange(event:ColorPickerEvent):void
+			{
+				if(swfItems)
+				{
+					var len:uint = swfItems.length;
+					for(var i:int=0; i<len; i++) 
+					{
+						swfItems[i].bgColor = event.color;
+					}
+				}
+			}
+			
 			private function handleComplete(event:Event):void
 			{
 				swfsLoaded++;
@@ -99,6 +112,18 @@
 				var targetSwfItem:SwfItem = event.currentTarget as SwfItem;
 				targetSwfItem.addEventListener(Event.COMPLETE, handleComplete);
 				targetSwfItem.loadSwf();
+			}
+			
+			private function handleMaskChange(event:Event):void
+			{
+				if(swfItems)
+				{
+					var len:uint = swfItems.length;
+					for(var i:int=0; i<len; i++) 
+					{
+						swfItems[i].maskSwfToBox = maskCheckBox.selected;
+					}
+				}
 			}
 			
 			private function handleSelect(event:Event):void
@@ -136,6 +161,8 @@
 				{
 					curSwfItem = new SwfItem();
 					curSwfItem.file = swfs[i].nativePath;
+					curSwfItem.maskSwfToBox = maskCheckBox.selected;
+					curSwfItem.bgColor = bgColorPicker.selectedColor;
 					swfContainer.addElement(curSwfItem);
 					curSwfItem.addEventListener(FlexEvent.CREATION_COMPLETE, handleCreationComplete);
 					swfItems.push(curSwfItem);
@@ -199,6 +226,13 @@
 			<s:Label fontSize="16" text="Folder:" />
 			<s:TextInput id="curFolderUrl" width="100%" editable="false" />
 			<s:Button id="browseBtn" label="Browse" click="handleClick(event)" />
+			<s:Spacer width="10" />
+			<s:CheckBox id="maskCheckBox" label="Mask to box" selected="true" change="handleMaskChange(event)" />
+			<s:Spacer width="10" />
+			<s:HGroup verticalAlign="middle">
+				<s:Label paddingTop="4" text="Background Color" />
+				<mx:ColorPicker id="bgColorPicker" selectedColor="#FFFFFF" change="handleColorChange(event)" />
+			</s:HGroup>
 		</s:HGroup>
 		<s:BorderContainer width="100%" height="100%">
 			<s:Scroller id="swfScrollPane"  width="100%" height="100%">

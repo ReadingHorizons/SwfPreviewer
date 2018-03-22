@@ -20,7 +20,12 @@
 			//  Private:
 			//----------------------------------
 			
+			[Bindable]
+			private var _bgColor:uint = 0xFFFFFF;
+			private var _created:Boolean = false;
+			private var _maskSwfToBox:Boolean = true;
 			private var loader:Loader;
+			private var maskShape:Shape;
 			private var swfFile:String;
 			private var swfFilename:String;
 			private var swfMovieClip:UIMovieClip;
@@ -30,10 +35,38 @@
 			//  Public:
 			//----------------------------------
 			
+			public function set bgColor(value:uint):void
+			{
+				_bgColor = value;
+			}
+			
+			public function get created():Boolean
+			{
+				return _created;
+			}
+			
 			public function set file(value:String):void
 			{
 				swfFile = value;
 				swfFilename = value.substr(value.lastIndexOf("\\")+1);
+			}
+			
+			public function set maskSwfToBox(value:Boolean):void
+			{
+				_maskSwfToBox = value;
+				if(_created)
+				{
+					if(_maskSwfToBox)
+					{
+						swfMovieClip.addChild(maskShape);
+						swfMovieClip.mask = maskShape;
+					}
+					else
+					{
+						swfMovieClip.removeChild(maskShape);
+						swfMovieClip.mask = null;
+					}
+				}
 			}
 			
 			//--------------------------------------------------------------------------
@@ -54,11 +87,15 @@
 				loader.contentLoaderInfo.removeEventListener(Event.COMPLETE, handleComplete);
 				
 				swfMovieClip = new UIMovieClip();
-				var maskShape:Shape = new Shape();
+				
+				maskShape = new Shape();
 				maskShape.graphics.beginFill(0x00FF00);
 				maskShape.graphics.drawRect(0, 0, swfContainerGroup.width, swfContainerGroup.height);
 				maskShape.graphics.endFill();
-				swfMovieClip.addChild(maskShape);
+				if(_maskSwfToBox)
+				{
+					swfMovieClip.addChild(maskShape);
+				}
 				
 				if(swf.width > targetSize)
 				{
@@ -76,12 +113,18 @@
 					targetScale = targetSize/swf.height;
 				}
 				swf.scaleX = swf.scaleY = targetScale;
+				swf.x = (maskShape.width-swf.width)/2;
+				swf.y = (maskShape.height-swf.height)/2;
 				swfMovieClip.addChild(swf);
-				swfMovieClip.mask = maskShape;
+				if(_maskSwfToBox)
+				{
+					swfMovieClip.mask = maskShape;
+				}
 				swfContainer.width = swf.width;
 				swfContainer.height = swf.height;
 				swfContainer.addElement(swfMovieClip);
 				dispatchEvent(event);
+				_created = true;
 			}
 			
 			//----------------------------------
@@ -105,6 +148,7 @@
 			
 			public function loadSwf():void
 			{
+				_created = false;
 				targetSize = this.width-40;
 				fileNameLabel.text = swfFilename;
 				loader = new Loader();
@@ -114,7 +158,7 @@
 			
 		]]>
 	</fx:Script>
-	<s:BorderContainer width="100%" height="100%">
+	<s:BorderContainer id="borderContainer" backgroundColor="{_bgColor}" width="100%" height="100%" >
 		<s:VGroup paddingBottom="6" paddingLeft="2" paddingRight="2" paddingTop="6" width="100%" height="100%">
 			<s:VGroup id="swfContainerGroup" width="100%" height="100%">
 				<s:Group id="swfContainer"/>
