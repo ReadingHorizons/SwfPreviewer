@@ -2,6 +2,7 @@
 <s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009" 
 					   xmlns:s="library://ns.adobe.com/flex/spark" 
 					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   showStatusBar="false"
 					   width="1024"
 					   height="768"
 					   applicationComplete="_handleAppComplete(event)">
@@ -15,6 +16,9 @@
 			import mx.controls.SWFLoader;
 			import mx.events.FlexEvent;
 			import mx.flash.UIMovieClip;
+			import mx.managers.SystemManager;
+			
+			import swfPreviewer.SwfItem;
 			
 			//--------------------------------------------------------------------------
 			//
@@ -26,11 +30,14 @@
 			//  Private:
 			//----------------------------------
 			
-			private var curFile:String;
-			private var curY:Number;
+			private const MINIMUM_COLUMN_PADDING:Number = 20;
+			private const ROW_PADDING:Number = 20;
+			
+			private var columnPadding:Number;
 			private var fileSystem:File;
-			private var files:Vector.<File>;
-			private var swfLoaders:Vector.<SWFLoader>;
+			private var swfItems:Vector.<SwfItem>;
+			private var swfs:Vector.<File>;
+			private var swfsLoaded:uint;
 			
 			//--------------------------------------------------------------------------
 			//
@@ -49,38 +56,58 @@
 			
 			private function _init():void
 			{
-				curY = 0;
-				
+				swfsLoaded = 0;
+				swfScrollPane.addEventListener(MouseEvent.MOUSE_WHEEL, bumpDelta, true);
 				createFileSystem();
+			}
+			
+			private function bumpDelta(event:MouseEvent):void
+			{
+				event.delta *= 10;
 			}
 			
 			private function createFileSystem():void
 			{
 				fileSystem = new File();
+				fileSystem.addEventListener(Event.CANCEL, handleCancel, false, 0, true);
 				fileSystem.addEventListener(Event.SELECT, handleSelect, false, 0, true);
+			}
+			
+			private function handleCancel(event:Event):void
+			{
+				loadingLabel.visible = false;
 			}
 			
 			private function handleClick(event:MouseEvent):void
 			{
+				loadingLabel.visible = true;
 				fileSystem.browseForDirectory("Select the folder that contains the swf files that you want to preview.");
 			}
 			
 			private function handleComplete(event:Event):void
 			{
-				trace("handleComplete");
-				var swfMovieClip:UIMovieClip = new UIMovieClip();
-				swfMovieClip.addChild(event.currentTarget.content);
-				swfContainer.addElement(swfMovieClip);
-				swfMovieClip.y = curY;
-				curY += swfMovieClip.height;
-				//swfScrollPane.
+				swfsLoaded++;
+				if(swfsLoaded == swfItems.length)
+				{
+					positionSwfs();
+					loadingLabel.visible = false;
+				}
+			}
+			
+			private function handleCreationComplete(event:FlexEvent):void
+			{
+				var targetSwfItem:SwfItem = event.currentTarget as SwfItem;
+				targetSwfItem.addEventListener(Event.COMPLETE, handleComplete);
+				targetSwfItem.loadSwf();
 			}
 			
 			private function handleSelect(event:Event):void
 			{
 				if(fileSystem.isDirectory)
 				{
-					files = new Vector.<File>();
+					removeSwfs();
+					curFolderUrl.text = event.currentTarget.url;
+					swfs = new Vector.<File>();
 					var fileArray:Array = fileSystem.getDirectoryListing();
 					var fileUrl:String;
 					var len:uint = fileArray.length;
@@ -89,40 +116,98 @@
 						fileUrl = fileArray[i].nativePath as String;
 						if(fileUrl.indexOf(".swf") > -1)
 						{
-							files.push(fileArray[i]);
+							swfs.push(fileArray[i]);
 						}
 					}
 					loadSwfs();
+				}
+				else
+				{
+					loadingLabel.visible = false;
 				}
 			}
 			
 			private function loadSwfs():void
 			{
-				swfLoaders =  new Vector.<SWFLoader>();
-				var curLoader:SWFLoader;
-				var len:uint = files.length;
-				len = 10;
+				swfItems = new Vector.<SwfItem>();
+				var curSwfItem:SwfItem;
+				var len:uint = swfs.length;
 				for(var i:int=0; i<len; i++) 
 				{
-					curLoader = new SWFLoader();
-					curLoader.addEventListener(Event.COMPLETE, handleComplete);
-					swfLoaders.push(curLoader);
-					curLoader.load(files[i].nativePath);
+					curSwfItem = new SwfItem();
+					curSwfItem.file = swfs[i].nativePath;
+					swfContainer.addElement(curSwfItem);
+					curSwfItem.addEventListener(FlexEvent.CREATION_COMPLETE, handleCreationComplete);
+					swfItems.push(curSwfItem);
 				}
+			}
+			
+			private function positionSwfs():void
+			{
+				var curItemIndex:uint = 0;
+				var curX:Number;
+				var curY:Number;
+				var itemWidth:Number = swfItems[0].width;
+				var itemsPerRow:uint = Math.floor(swfScrollPane.width / itemWidth);
+				var totalWidthItemsWithPadding:Number = (itemWidth*itemsPerRow)+(MINIMUM_COLUMN_PADDING*(itemsPerRow+1));
+				if(totalWidthItemsWithPadding > swfScrollPane.width)
+				{
+					itemsPerRow--;
+				}
+				var totalWidthItems:Number = itemWidth*itemsPerRow;
+				columnPadding = (swfScrollPane.width - totalWidthItems) / (itemsPerRow+1);
+				curY = ROW_PADDING;
+				var numRows:uint = Math.ceil(swfItems.length/itemsPerRow);
+				for(var i:int=0; i<numRows; i++) 
+				{
+					curX = columnPadding;
+					for(var j:int=0; j<itemsPerRow; j++) 
+					{
+						swfItems[curItemIndex].x = curX;
+						swfItems[curItemIndex].y = curY;
+						curX = swfItems[curItemIndex].x+swfItems[curItemIndex].width+columnPadding;
+						curItemIndex++;
+						if(curItemIndex > swfItems.length-1)
+						{
+							return;
+						}
+					}
+					curY += (swfItems[curItemIndex-1].height+ROW_PADDING);
+				}
+			}
+			
+			private function removeSwfs():void
+			{
+				swfsLoaded = 0;
+				if(swfItems)
+				{
+					var len:uint = swfItems.length;
+					for(var i:int=0; i<len; i++) 
+					{
+						swfItems[i].destroy();
+					}
+				}
+				swfContainer.removeAllElements();
 			}
 			
 		]]>
 	</fx:Script>
 	
-	<s:VGroup width="100%" height="100%">
-		<s:HGroup>
-			<s:Button id="browseBtn" label="Browse" click="handleClick(event)"/>
+	<s:VGroup paddingBottom="12" paddingLeft="12" paddingRight="12" horizontalAlign="center" verticalAlign="top" width="100%" height="100%">
+		<s:Label fontSize="32" text="Swf Preview Tool" paddingTop="12" textAlign="center" width="100%" />
+		<s:HGroup verticalAlign="middle" width="100%">
+			<s:Label fontSize="16" text="Folder:" />
+			<s:TextInput id="curFolderUrl" width="100%" editable="false" />
+			<s:Button id="browseBtn" label="Browse" click="handleClick(event)" />
 		</s:HGroup>
-		<s:Scroller id="swfScrollPane" width="100%" height="100%">
-			<s:Group id="swfContainer" width="100%" height="100%">
-				
-			</s:Group>
-		</s:Scroller>
+		<s:BorderContainer width="100%" height="100%">
+			<s:Scroller id="swfScrollPane"  width="100%" height="100%">
+				<s:Group id="swfContainer" width="100%" height="100%"></s:Group>
+			</s:Scroller>
+		</s:BorderContainer>
 	</s:VGroup>
+	<s:BorderContainer id="loadingLabel" backgroundAlpha=".5" backgroundColor="#CCCCCC" borderAlpha=".5" borderColor="#CCCCCC" width="100%" height="100%" visible="false">
+		<s:Label text="Loading..." fontSize="36" horizontalCenter="0" verticalCenter="0" />
+	</s:BorderContainer>
 	
 </s:WindowedApplication>

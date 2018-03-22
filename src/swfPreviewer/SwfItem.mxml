@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="150"
+		 height="150">
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.events.FlexEvent;
+			import mx.flash.UIMovieClip;
+			
+			//--------------------------------------------------------------------------
+			//
+			//  Properties
+			//
+			//--------------------------------------------------------------------------
+			
+			//----------------------------------
+			//  Private:
+			//----------------------------------
+			
+			private var loader:Loader;
+			private var swfFile:String;
+			private var swfFilename:String;
+			private var swfMovieClip:UIMovieClip;
+			private var targetSize:Number;
+			
+			//----------------------------------
+			//  Public:
+			//----------------------------------
+			
+			public function set file(value:String):void
+			{
+				swfFile = value;
+				swfFilename = value.substr(value.lastIndexOf("\\")+1);
+			}
+			
+			//--------------------------------------------------------------------------
+			//
+			//  Methods
+			//
+			//--------------------------------------------------------------------------
+			
+			//----------------------------------
+			//  Private:
+			//----------------------------------
+			
+			private function handleComplete(event:Event):void
+			{
+				var swf:MovieClip = event.currentTarget.content;
+				var targetScale:Number = 1;
+				
+				loader.contentLoaderInfo.removeEventListener(Event.COMPLETE, handleComplete);
+				
+				swfMovieClip = new UIMovieClip();
+				var maskShape:Shape = new Shape();
+				maskShape.graphics.beginFill(0x00FF00);
+				maskShape.graphics.drawRect(0, 0, swfContainerGroup.width, swfContainerGroup.height);
+				maskShape.graphics.endFill();
+				swfMovieClip.addChild(maskShape);
+				
+				if(swf.width > targetSize)
+				{
+					if(swf.width > swf.height)
+					{
+						targetScale = targetSize/swf.width;
+					}
+					else
+					{
+						targetScale = targetSize/swf.height;
+					}
+				}
+				else if(swf.height > targetSize)
+				{
+					targetScale = targetSize/swf.height;
+				}
+				swf.scaleX = swf.scaleY = targetScale;
+				swfMovieClip.addChild(swf);
+				swfMovieClip.mask = maskShape;
+				swfContainer.width = swf.width;
+				swfContainer.height = swf.height;
+				swfContainer.addElement(swfMovieClip);
+				dispatchEvent(event);
+			}
+			
+			//----------------------------------
+			//  Public:
+			//----------------------------------
+			
+			public function destroy():void
+			{
+				if(loader)
+				{
+					loader.contentLoaderInfo.removeEventListener(Event.COMPLETE, handleComplete);
+					loader = null;
+				}
+				if(swfMovieClip)
+				{
+					swfMovieClip.removeChildren();
+					swfMovieClip = null;
+				}
+				swfContainer.removeAllElements();
+			}
+			
+			public function loadSwf():void
+			{
+				targetSize = this.width-40;
+				fileNameLabel.text = swfFilename;
+				loader = new Loader();
+				loader.contentLoaderInfo.addEventListener(Event.COMPLETE, handleComplete);
+				loader.load(new URLRequest(swfFile));
+			}
+			
+		]]>
+	</fx:Script>
+	<s:BorderContainer width="100%" height="100%">
+		<s:VGroup paddingBottom="6" paddingLeft="2" paddingRight="2" paddingTop="6" width="100%" height="100%">
+			<s:VGroup id="swfContainerGroup" width="100%" height="100%">
+				<s:Group id="swfContainer"/>
+			</s:VGroup>
+			<s:Label id="fileNameLabel" textAlign="center" width="100%" />
+		</s:VGroup>
+	</s:BorderContainer>
+	
+</s:Group>
