@@ -92,6 +92,8 @@
 				maskShape.graphics.beginFill(0x00FF00);
 				maskShape.graphics.drawRect(0, 0, swfContainerGroup.width, swfContainerGroup.height);
 				maskShape.graphics.endFill();
+				//trace("swf: "+swf.width+"x"+swf.height);
+				//trace("loaderInfo: "+swf.loaderInfo.width+"x"+swf.loaderInfo.height);
 				if(_maskSwfToBox)
 				{
 					swfMovieClip.addChild(maskShape);
